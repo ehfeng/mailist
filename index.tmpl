@@ -1,0 +1,24 @@
+<html>
+
+<head>
+	<title>Mailist</title>
+	<link rel="icon" type="image/png" href="/static/favicon.ico"/>
+	<link rel="stylesheet" type="text/css" href="/static/main.css" />
+</head>
+
+<body>
+	<h1>Mailist</h1>
+	<div style="font-style: italic;">Personable mailing lists</div>
+	<br>
+	<form method="POST" action="/lists">
+		<label>Create new list</label>
+		<input name="name" type="text" />
+	</form>
+	{{range .ListNames}}
+	<div>
+		<a href="/{{.}}">{{.}}</a>&nbsp;<span class="delete-list" data-name="{{.}}">🗑</span>
+	</div>
+	{{end}}
+	<script src="/static/main.js"></script>
+</body>
+</html>

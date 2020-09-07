@@ -1,0 +1,35 @@
+<html>
+<head>
+<title>{{.Listname}} — Mailist</title>
+<link rel="icon" type="image/png" href="/static/favicon.ico"/>
+<style>
+.delete-subscriber {
+    display: inline;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+<h1><a href="/">🏚</a>&nbsp;<span>{{.Listname}}<span></h1>
+<br>
+<button id="copy-to-clipboard">Copy all to clipboard</button>
+<br>
+<br>
+<form method="POST">
+<input type="email" name="email" placeholder="Add email" />
+</form>
+{{range .SubscriberEmails}}
+<div>
+    <span>{{.}}</span>&nbsp;<span class="delete-subscriber" data-email="{{.}}">🗑</span>
+</div>
+{{end}}
+<script type="text/javascript">
+var emails = [{{range .SubscriberEmails}}"{{.}}", {{end}}];
+var copyToClipboardEl = document.getElementById("copy-to-clipboard")
+copyToClipboardEl.onclick = () => {
+    navigator.clipboard.writeText(emails.join(", "))
+}
+</script>
+<script src="/static/main.js"></script>
+</body>
+</html>
