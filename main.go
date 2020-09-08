@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx"
 )
 
-var forbiddenNames = map[string]bool{"lists": true, "login": true}
+var forbiddenNames = map[string]bool{"lists": true, "login": true, "static": true}
 
 func (s *server) isAdmin(r *http.Request) bool {
 	cookie, err := r.Cookie("t")
@@ -107,7 +107,6 @@ type listTemplateArgs struct {
 	SubscriberEmails []string
 }
 
-// POST or PUT posts an item
 func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	listName := mux.Vars(r)["listname"]
 	if r.Method == "OPTIONS" {
@@ -118,17 +117,18 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		r.ParseForm()
-		emails := r.PostForm["email"]
-		tx, err := s.conn.Begin()
+		email := r.FormValue("email")
+		if email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		cmdTag, err := s.conn.Exec("insert into subscribers(list, email) values ($1, $2) on conflict do nothing", listName, email)
 		if err != nil {
 			panic(err)
 		}
-		defer tx.Rollback()
-		for _, email := range emails {
-			tx.Exec("insert into subscribers(list, email) values ($1, $2)", listName, email)
+		if cmdTag.RowsAffected() != 1 {
+			log.Println("Duplicate email subscriber", email)
 		}
-		tx.Commit()
 
 		redirectUrl := r.URL.Query().Get("next")
 		if redirectUrl == "" {
