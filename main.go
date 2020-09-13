@@ -150,7 +150,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	// To be used for input validation
+	// TODO use for create list input validation
 	if r.Method == "HEAD" {
 		w.WriteHeader(http.StatusFound)
 		return
@@ -239,5 +239,5 @@ func main() {
 	router.HandleFunc("/{listname}", s.list)
 	router.HandleFunc("/{listname}/unsubscribe", s.unsubscribe)
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe(":"+os.Getenv(("PORT")), router))
 }

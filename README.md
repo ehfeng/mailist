@@ -13,11 +13,9 @@ Meant to be deployed on your own domain.
 
 This doesn't send the emails, but lets you copy the emails to the To field. Gmail only allows for 500 emails per message AND per day.
 
-You can add emails manually and those do not need to be validated.
-
 # API
 
 ```
-POST /list?next&referrer
+POST /list?next
 Content-Type: application/x-www-form-urlencoded
 ```
