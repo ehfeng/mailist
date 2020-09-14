@@ -5,7 +5,9 @@ Description=mailist
 Type=simple
 Restart=always
 RestartSec=5s
-ExecStart=/home/eric/go/mailist/mailist
+User=eric
+WorkingDirectory=/home/eric/go/src/github.com/ehfeng/mailist
+ExecStart=/home/eric/go/src/github.com/ehfeng/mailist/mailist -admin-password <password>
 
 [Install]
 WantedBy=multi-user.target
