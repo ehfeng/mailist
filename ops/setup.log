@@ -1,0 +1,33 @@
+# Following DO tutorial
+# https://www.digitalocean.com/community/tutorials/how-to-deploy-a-go-web-application-using-nginx-on-ubuntu-18-04
+
+# https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-20-04
+
+adduser eric
+usermod -aG sudo eric
+ufw allow OpenSSH
+ufw enable
+rsync --archive --chown=eric:eric ~/.ssh /home/eric
+
+# Go to https://golang.org/dl/
+wget <url from above>
+sha256sum <downloaded tarball>
+sudo tar -xvf <downloaded tarball>
+sudo mv go /usr/local
+sudo chown -R root:root /usr/local/go
+mkdir -p $HOME/go/{bin,src}
+
+# https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-20-04
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d mailist.ehfeng.com
+
+# https://www.digitalocean.com/community/tutorials/how-to-install-postgresql-on-ubuntu-20-04-quickstart
+sudo apt install postgresql
+sudo -u postgres createuser --interactive
+sudo createdb mailist
+
+# Clone into home dir
+git clone git@github.com/ehfeng/mailist
+
+sudo cp mailist.service /lib/systemd/system/mailist.service
+sudo service mailist start

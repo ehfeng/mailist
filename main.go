@@ -239,5 +239,5 @@ func main() {
 	router.HandleFunc("/{listname}", s.list)
 	router.HandleFunc("/{listname}/unsubscribe", s.unsubscribe)
 
-	log.Fatal(http.ListenAndServe(":"+os.Getenv(("PORT")), router))
+	log.Fatal(http.ListenAndServe(":9990", router))
 }

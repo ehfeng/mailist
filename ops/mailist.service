@@ -1,0 +1,11 @@
+[Unit]
+Description=mailist
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+ExecStart=/home/eric/go/mailist/mailist
+
+[Install]
+WantedBy=multi-user.target
