@@ -9,7 +9,7 @@
 				window.location = JSON.parse(xhr.responseText);
 			}
 		};
-		xhr.open("POST", `/{{.Listname}}/recaptcha?token=${encodeURIComponent(token)}&email=${encodeURIComponent({{.Email}})}&next=${encodeURIComponent({{.Next}})}`);
+		xhr.open("POST", `/{{.Listname}}/recaptcha?token=${encodeURIComponent(token)}&email=${encodeURIComponent("{{.Email}}")}&next=${encodeURIComponent("{{.Next}}")}`);
 		xhr.setRequestHeader("Content-Type", "application/json")
 		xhr.send();
 	}
