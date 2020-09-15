@@ -6,6 +6,9 @@ Type=simple
 Restart=always
 RestartSec=5s
 User=eric
+Environment=AdminPassword=
+Environment=RecaptchaSiteKey=
+Environment=RecaptchaSecret=
 WorkingDirectory=/home/eric/go/src/github.com/ehfeng/mailist
 ExecStart=/home/eric/go/src/github.com/ehfeng/mailist/mailist -admin-password <password>
 

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +14,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
 )
+
+const RecaptchaSiteVerifyUrl = "https://www.google.com/recaptcha/api/siteverify"
 
 var forbiddenNames = map[string]bool{"lists": true, "login": true, "static": true}
 
@@ -32,7 +36,10 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	if token == s.config.adminPassword {
 		http.SetCookie(w, &http.Cookie{Name: "t", Value: token, MaxAge: 365 * 24 * 60 * 60, Path: "/"})
 		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
+	w.WriteHeader(http.StatusNotFound)
+	return
 }
 
 var indexTemplate = template.Must(template.ParseFiles("index.tmpl"))
@@ -101,14 +108,31 @@ func (s *server) lists(w http.ResponseWriter, r *http.Request) {
 }
 
 var listTemplate = template.Must(template.ParseFiles("list.tmpl"))
+var recaptchaTemplate = template.Must(template.ParseFiles("recaptcha.tmpl"))
 
 type listTemplateArgs struct {
 	Listname         string
 	SubscriberEmails []string
 }
 
+type recaptchaArgs struct {
+	Listname         string
+	Email            string
+	Next             string
+	RecaptchaSiteKey string
+}
+
 func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	listName := mux.Vars(r)["listname"]
+	var listExists bool
+	err := s.conn.QueryRow("SELECT true FROM lists WHERE name = $1", listName).Scan(&listExists)
+	if err == pgx.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		panic(err)
+	}
+
 	if r.Method == "OPTIONS" {
 		w.Header().Set("Access-Control-Allow-Origin", s.config.corsOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "POST, PUT, OPTIONS")
@@ -122,32 +146,22 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		cmdTag, err := s.conn.Exec("insert into subscribers(list, email) values ($1, $2) on conflict do nothing", listName, email)
-		if err != nil {
-			panic(err)
+		next := r.FormValue("next")
+		if next == "" {
+			next = r.URL.Query().Get("next")
 		}
-		if cmdTag.RowsAffected() != 1 {
-			log.Println("Duplicate email subscriber", email)
+		args := recaptchaArgs{
+			Listname:         listName,
+			Email:            email,
+			Next:             next,
+			RecaptchaSiteKey: s.config.recaptchaSiteKey,
 		}
-
-		redirectUrl := r.URL.Query().Get("next")
-		if redirectUrl == "" {
-			redirectUrl = "/" + listName
-		}
-		http.Redirect(w, r, redirectUrl, http.StatusFound)
+		recaptchaTemplate.Execute(w, args)
 		return
 	}
 	if !s.isAdmin(r) {
 		w.WriteHeader(403)
 		return
-	}
-	var listExists bool
-	err := s.conn.QueryRow("SELECT true FROM lists WHERE name = $1", listName).Scan(&listExists)
-	if err == pgx.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	} else if err != nil {
-		panic(err)
 	}
 
 	// TODO use for create list input validation
@@ -199,12 +213,65 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (s *server) unsubscribe(w http.ResponseWriter, r *http.Request) {
+type RecaptchaVerifyRequest struct {
+	Secret   string `json:"secret"`
+	Response string `json:"response"`
+}
+
+type RecaptchaVerifyResponse struct {
+	Success bool    `json:"success"`
+	Score   float32 `json:"score"`
+}
+
+func (s *server) recaptcha(w http.ResponseWriter, r *http.Request) {
+	listName := mux.Vars(r)["listname"]
+	email := mux.Vars(r)["mail"]
+	redirectUrl := r.URL.Query().Get("next")
+
+	verifyRequest := RecaptchaVerifyRequest{
+		Secret:   s.config.recaptchaSecret,
+		Response: r.URL.Query().Get("token"),
+	}
+	reqBytes, err := json.Marshal(verifyRequest)
+	if err != nil {
+		panic(err)
+	}
+
+	resp, err := http.Post(RecaptchaSiteVerifyUrl, "application/json", bytes.NewBuffer(reqBytes))
+	if err != nil {
+		panic(err)
+	}
+	var respBytes []byte
+	_, err = resp.Body.Read(respBytes)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	var verifyResp RecaptchaVerifyResponse
+	if err := json.Unmarshal(respBytes, &verifyResp); err != nil {
+		panic(err)
+	}
+	if verifyResp.Success {
+		cmdTag, err := s.conn.Exec("insert into subscribers(list, email) values ($1, $2) on conflict do nothing", listName, email)
+		if err != nil {
+			panic(err)
+		}
+		if cmdTag.RowsAffected() != 1 {
+			log.Println("Duplicate email subscriber", email)
+		}
+	}
+	if redirectUrl == "" {
+		redirectUrl = "/" + listName
+	}
+	http.Redirect(w, r, redirectUrl, http.StatusFound)
+	return
 }
 
 type serverConfig struct {
-	adminPassword string
-	corsOrigin    string
+	adminPassword    string
+	corsOrigin       string
+	recaptchaSiteKey string
+	recaptchaSecret  string
 }
 
 type server struct {
@@ -213,7 +280,7 @@ type server struct {
 }
 
 func main() {
-	passwordPtr := flag.String("admin-password", "", "Go to /login/<password> to login")
+	fmt.Println("Starting server...")
 	corsOriginPtr := flag.String("cors-origin", "*", "CORS preflight origin header")
 	flag.Parse()
 
@@ -225,7 +292,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	s := server{conn, serverConfig{*passwordPtr, *corsOriginPtr}}
+	s := server{conn, serverConfig{os.Getenv("AdminPassword"), *corsOriginPtr, os.Getenv("RecaptchaSiteKey"), os.Getenv("RecaptchaSecret")}}
 	router := mux.NewRouter()
 
 	// router.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
@@ -237,7 +304,8 @@ func main() {
 
 	router.HandleFunc("/lists", s.lists)
 	router.HandleFunc("/{listname}", s.list)
-	router.HandleFunc("/{listname}/unsubscribe", s.unsubscribe)
+	router.HandleFunc("/{listname}/recaptcha", s.recaptcha)
 
+	fmt.Println("Server available at localhost:9990")
 	log.Fatal(http.ListenAndServe(":9990", router))
 }

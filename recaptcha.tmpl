@@ -1,0 +1,31 @@
+<html>
+<head>
+<title>Mailst</title>
+<script type="text/javascript">
+	var onSubmit = (token) => {
+		var xhr = new XMLHttpRequest();
+		xhr.onreadystatechange = function () {
+			if(xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+				window.location = JSON.parse(xhr.responseText);
+			}
+		};
+		xhr.open("POST", `/{{.Listname}}/recaptcha?token=${encodeURIComponent(token)}&email=${encodeURIComponent({{.Email}})}&next=${encodeURIComponent({{.Next}})}`);
+		xhr.setRequestHeader("Content-Type", "application/json")
+		xhr.send();
+	}
+	var onloadCallback = () => {
+		grecaptcha.render('recaptcha');
+		grecaptcha.execute();
+	}
+</script>
+</head>
+<body>
+	<div id="recaptcha"
+     class="g-recaptcha"
+     data-sitekey="{{.RecaptchaSiteKey}}"
+     data-callback="onSubmit"
+     data-size="invisible">
+</div>
+	<script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit" async defer></script>
+</body>
+</html>
