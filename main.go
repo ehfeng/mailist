@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"text/template"
@@ -216,11 +217,6 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-type RecaptchaVerifyRequest struct {
-	Secret   string `json:"secret"`
-	Response string `json:"response"`
-}
-
 type RecaptchaVerifyResponse struct {
 	Success bool    `json:"success"`
 	Score   float32 `json:"score"`
@@ -228,30 +224,20 @@ type RecaptchaVerifyResponse struct {
 
 func (s *server) recaptcha(w http.ResponseWriter, r *http.Request) {
 	listName := mux.Vars(r)["listname"]
-	email := mux.Vars(r)["email"]
+	email := r.URL.Query().Get("email")
 	redirectUrl := r.URL.Query().Get("next")
 
-	verifyRequest := RecaptchaVerifyRequest{
-		Secret:   s.config.recaptchaSecret,
-		Response: r.URL.Query().Get("token"),
-	}
-	reqBytes, err := json.Marshal(verifyRequest)
+	resp, err := http.PostForm(RecaptchaSiteVerifyUrl, url.Values{"secret": {s.config.recaptchaSecret}, "response": {r.URL.Query().Get("token")}})
 	if err != nil {
 		panic(err)
 	}
-
-	resp, err := http.Post(RecaptchaSiteVerifyUrl, "application/json", bytes.NewBuffer(reqBytes))
-	if err != nil {
-		panic(err)
-	}
-	var respBytes []byte
-	_, err = resp.Body.Read(respBytes)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 	var verifyResp RecaptchaVerifyResponse
-	if err := json.Unmarshal(respBytes, &verifyResp); err != nil {
+	if err := json.Unmarshal(body, &verifyResp); err != nil {
 		panic(err)
 	}
 	if verifyResp.Success {
