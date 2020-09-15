@@ -150,6 +150,9 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		if next == "" {
 			next = r.URL.Query().Get("next")
 		}
+		if next == "" {
+			next = "/" + listName
+		}
 		args := recaptchaArgs{
 			Listname:         listName,
 			Email:            email,
