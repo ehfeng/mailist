@@ -228,7 +228,7 @@ type RecaptchaVerifyResponse struct {
 
 func (s *server) recaptcha(w http.ResponseWriter, r *http.Request) {
 	listName := mux.Vars(r)["listname"]
-	email := mux.Vars(r)["mail"]
+	email := mux.Vars(r)["email"]
 	redirectUrl := r.URL.Query().Get("next")
 
 	verifyRequest := RecaptchaVerifyRequest{
